@@ -1,6 +1,8 @@
 # rtw88 downstream 🐧
 ### This is a downstream repo for the Linux in-kernel rtw88 series of drivers for Realtek WiFi 5 chips.
 
+This repo is based on https://github.com/lwfinger/rtw88, but resynced with the latest wireless-next branch. To keep this repo clean, additional changes in the https://github.com/lwfinger/rtw88 repo, such as support for rtl8812au and rtl8821au, are not in this repo (yet).
+
 🌟 **Up-to-Date Drivers**: The code in this repo stays in sync with the `wireless-next` repository, with additional changes to accommodate kernel API changes over time. The current repo matches the kernel as of October 4, 2024.
 
 📌 **Note**: The `wireless-next` repo contains the code set for the ***next*** kernel version. If kernel 6.X is out, kernel mainline repo is on 6.X+1-rcY, and `wireless-next` targets kernel 6.X+2 material.
