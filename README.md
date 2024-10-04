@@ -77,7 +77,7 @@ sudo apt install -y raspberrypi-kernel-headers build-essential bc git
 ### Basic Installation for All Distros 🛠
 
 ```bash
-git clone https://github.com/lwfinger/rtw88
+git clone https://github.com/henkv1/rtw88-next
 ```
 ```bash
 cd rtw88
@@ -92,7 +92,7 @@ sudo make install
 ### Installation with SecureBoot for All Distros 🔒
 
 ```bash
-git clone https://github.com/lwfinger/rtw88
+git clone https://github.com/henkv1/rtw88-next
 ```
 ```bash
 cd rtw88
