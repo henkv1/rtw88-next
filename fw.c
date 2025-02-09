@@ -196,11 +196,7 @@ legacy:
 	si->ra_report.desc_rate = rate;
 	si->ra_report.bit_rate = bit_rate;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
 	sta->deflink.agg.max_rc_amsdu_len = get_max_amsdu_len(bit_rate);
-#else
-	sta->max_rc_amsdu_len = get_max_amsdu_len(bit_rate);
-#endif
 }
 
 static void rtw_fw_ra_report_handle(struct rtw_dev *rtwdev, u8 *payload,
@@ -336,6 +332,9 @@ void rtw_fw_c2h_cmd_handle(struct rtw_dev *rtwdev, struct sk_buff *skb)
 	case C2H_RA_RPT:
 		rtw_fw_ra_report_handle(rtwdev, c2h->payload, len);
 		break;
+	case C2H_ADAPTIVITY:
+		rtw_fw_adaptivity_result(rtwdev, c2h->payload, len);
+		break;
 	default:
 		rtw_dbg(rtwdev, RTW_DBG_FW, "C2H 0x%x isn't handled\n", c2h->id);
 		break;
@@ -369,10 +368,6 @@ void rtw_fw_c2h_cmd_rx_irqsafe(struct rtw_dev *rtwdev, u32 pkt_offset,
 	case C2H_SCAN_RESULT:
 		complete(&rtwdev->fw_scan_density);
 		rtw_fw_scan_result(rtwdev, c2h->payload, len);
-		dev_kfree_skb_any(skb);
-		break;
-	case C2H_ADAPTIVITY:
-		rtw_fw_adaptivity_result(rtwdev, c2h->payload, len);
 		dev_kfree_skb_any(skb);
 		break;
 	default:
@@ -735,19 +730,12 @@ void rtw_fw_send_rssi_info(struct rtw_dev *rtwdev, struct rtw_sta_info *si)
 	rtw_fw_send_h2c_command(rtwdev, h2c_pkt);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
 void rtw_fw_send_ra_info(struct rtw_dev *rtwdev, struct rtw_sta_info *si,
 			 bool reset_ra_mask)
-#else
-void rtw_fw_send_ra_info(struct rtw_dev *rtwdev, struct rtw_sta_info *si)
-#endif
 {
 	u8 h2c_pkt[H2C_PKT_SIZE] = {0};
 	bool disable_pt = true;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
-	bool reset_ra_mask = true;
-#endif
-	
+
 	SET_H2C_CMD_ID_CLASS(h2c_pkt, H2C_CMD_RA_INFO);
 
 	SET_RA_INFO_MACID(h2c_pkt, si->mac_id);
@@ -1243,11 +1231,7 @@ static struct sk_buff *rtw_get_rsvd_page_skb(struct ieee80211_hw *hw,
 
 	switch (rsvd_pkt->type) {
 	case RSVD_BEACON:
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
 		skb_new = ieee80211_beacon_get_tim(hw, vif, &tim_offset, NULL, 0);
-#else
-		skb_new = ieee80211_beacon_get_tim(hw, vif, &tim_offset, NULL);
-#endif
 		rsvd_pkt->tim_offset = tim_offset;
 		break;
 	case RSVD_PS_POLL:
@@ -1257,26 +1241,10 @@ static struct sk_buff *rtw_get_rsvd_page_skb(struct ieee80211_hw *hw,
 		skb_new = ieee80211_proberesp_get(hw, vif);
 		break;
 	case RSVD_NULL:
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 17)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
 		skb_new = ieee80211_nullfunc_get(hw, vif, -1, false);
-#else
-		skb_new = ieee80211_nullfunc_get(hw, vif, false);
-#endif
-#else
-		skb_new = ieee80211_nullfunc_get(hw, vif);
-#endif
-	break;
+		break;
 	case RSVD_QOS_NULL:
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 17)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
 		skb_new = ieee80211_nullfunc_get(hw, vif, -1, true);
-#else
-		skb_new = ieee80211_nullfunc_get(hw, vif, true);
-#endif
-#else
-		skb_new = ieee80211_nullfunc_get(hw, vif);
-#endif
 		break;
 	case RSVD_LPS_PG_DPK:
 		skb_new = rtw_lps_pg_dpk_get(hw);

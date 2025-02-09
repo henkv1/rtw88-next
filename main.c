@@ -19,6 +19,7 @@
 #include "bf.h"
 #include "sar.h"
 #include "sdio.h"
+#include "led.h"
 
 bool rtw_disable_lps_deep_mode;
 EXPORT_SYMBOL(rtw_disable_lps_deep_mode);
@@ -191,12 +192,8 @@ static void rtw_vif_watch_dog_iter(void *data, struct ieee80211_vif *vif)
 	struct rtw_vif *rtwvif = (struct rtw_vif *)vif->drv_priv;
 
 	if (vif->type == NL80211_IFTYPE_STATION)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
 		if (vif->cfg.assoc)
-#else
-		if (vif->bss_conf.assoc)
-#endif
-		iter_data->rtwvif = rtwvif;
+			iter_data->rtwvif = rtwvif;
 
 	rtw_dynamic_csi_rate(iter_data->rtwdev, rtwvif);
 
@@ -585,7 +582,6 @@ EXPORT_SYMBOL(rtw_dump_reg);
 void rtw_vif_assoc_changed(struct rtw_vif *rtwvif,
 			   struct ieee80211_bss_conf *conf)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
 	struct ieee80211_vif *vif = NULL;
 
 	if (conf)
@@ -593,10 +589,6 @@ void rtw_vif_assoc_changed(struct rtw_vif *rtwvif,
 
 	if (conf && vif->cfg.assoc) {
 		rtwvif->aid = vif->cfg.aid;
-#else
-	if (conf && conf->assoc) {
-		rtwvif->aid = conf->aid;
-#endif
 		rtwvif->net_type = RTW_NET_MGD_LINKED;
 	} else {
 		rtwvif->aid = 0;
@@ -1015,11 +1007,7 @@ static void rtw_hw_config_rf_ant_num(struct rtw_dev *rtwdev, u8 hw_ant_num)
 static u64 get_vht_ra_mask(struct ieee80211_sta *sta)
 {
 	u64 ra_mask = 0;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 	u16 mcs_map = le16_to_cpu(sta->deflink.vht_cap.vht_mcs.rx_mcs_map);
-#else
-	u16 mcs_map = le16_to_cpu(sta->vht_cap.vht_mcs.rx_mcs_map);
-#endif
 	u8 vht_mcs_cap;
 	int i, nss;
 
@@ -1230,7 +1218,6 @@ void rtw_update_sta_info(struct rtw_dev *rtwdev, struct rtw_sta_info *si,
 	u8 wireless_set;
 	u8 bw_mode;
 	u8 rate_id;
-	u8 rf_type = RF_1T1R;
 	u8 stbc_en = 0;
 	u8 ldpc_en = 0;
 	u8 tx_num = 1;
@@ -1239,26 +1226,13 @@ void rtw_update_sta_info(struct rtw_dev *rtwdev, struct rtw_sta_info *si,
 	bool is_vht_enable = false;
 	bool is_support_sgi = false;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 	if (sta->deflink.vht_cap.vht_supported) {
-#else
-	if (sta->vht_cap.vht_supported) {
-#endif
 		is_vht_enable = true;
 		ra_mask |= get_vht_ra_mask(sta);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 		if (sta->deflink.vht_cap.cap & IEEE80211_VHT_CAP_RXSTBC_MASK)
-#else
-		if (sta->vht_cap.cap & IEEE80211_VHT_CAP_RXSTBC_MASK)
-#endif
 			stbc_en = VHT_STBC_EN;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 		if (sta->deflink.vht_cap.cap & IEEE80211_VHT_CAP_RXLDPC)
-#else
-		if (sta->vht_cap.cap & IEEE80211_VHT_CAP_RXLDPC)
-#endif
 			ldpc_en = VHT_LDPC_EN;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 	} else if (sta->deflink.ht_cap.ht_supported) {
 		ra_mask |= (sta->deflink.ht_cap.mcs.rx_mask[1] << 20) |
 			   (sta->deflink.ht_cap.mcs.rx_mask[0] << 12);
@@ -1266,39 +1240,18 @@ void rtw_update_sta_info(struct rtw_dev *rtwdev, struct rtw_sta_info *si,
 			stbc_en = HT_STBC_EN;
 		if (sta->deflink.ht_cap.cap & IEEE80211_HT_CAP_LDPC_CODING)
 			ldpc_en = HT_LDPC_EN;
-#else
-	} else if (sta->ht_cap.ht_supported) {
-		ra_mask |= (sta->ht_cap.mcs.rx_mask[1] << 20) |
-			   (sta->ht_cap.mcs.rx_mask[0] << 12);
-		if (sta->ht_cap.cap & IEEE80211_HT_CAP_RX_STBC)
-			stbc_en = HT_STBC_EN;
-		if (sta->ht_cap.cap & IEEE80211_HT_CAP_LDPC_CODING)
-			ldpc_en = HT_LDPC_EN;
-#endif
 	}
 
 	if (efuse->hw_cap.nss == 1 || rtwdev->hal.txrx_1ss)
 		ra_mask &= RA_MASK_VHT_RATES_1SS | RA_MASK_HT_RATES_1SS;
 
 	if (hal->current_band_type == RTW_BAND_5G) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 		ra_mask |= (u64)sta->deflink.supp_rates[NL80211_BAND_5GHZ] << 4;
-#else
-		ra_mask |= (u64)sta->supp_rates[NL80211_BAND_5GHZ] << 4;
-#endif
 		ra_mask_bak = ra_mask;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 		if (sta->deflink.vht_cap.vht_supported) {
-#else
-		if (sta->vht_cap.vht_supported) {
-#endif
 			ra_mask &= RA_MASK_VHT_RATES | RA_MASK_OFDM_IN_VHT;
 			wireless_set = WIRELESS_OFDM | WIRELESS_VHT;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 		} else if (sta->deflink.ht_cap.ht_supported) {
-#else
-		} else if (sta->ht_cap.ht_supported) {
-#endif
 			ra_mask &= RA_MASK_HT_RATES | RA_MASK_OFDM_IN_HT_5G;
 			wireless_set = WIRELESS_OFDM | WIRELESS_HT;
 		} else {
@@ -1306,35 +1259,19 @@ void rtw_update_sta_info(struct rtw_dev *rtwdev, struct rtw_sta_info *si,
 		}
 		dm_info->rrsr_val_init = RRSR_INIT_5G;
 	} else if (hal->current_band_type == RTW_BAND_2G) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 		ra_mask |= sta->deflink.supp_rates[NL80211_BAND_2GHZ];
-#else
-		ra_mask |= sta->supp_rates[NL80211_BAND_2GHZ];
-#endif
 		ra_mask_bak = ra_mask;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 		if (sta->deflink.vht_cap.vht_supported) {
-#else
-		if (sta->vht_cap.vht_supported) {
-#endif
 			ra_mask &= RA_MASK_VHT_RATES | RA_MASK_CCK_IN_VHT |
 				   RA_MASK_OFDM_IN_VHT;
 			wireless_set = WIRELESS_CCK | WIRELESS_OFDM |
 				       WIRELESS_HT | WIRELESS_VHT;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 		} else if (sta->deflink.ht_cap.ht_supported) {
-#else
-		} else if (sta->ht_cap.ht_supported) {
-#endif
 			ra_mask &= RA_MASK_HT_RATES | RA_MASK_CCK_IN_HT |
 				   RA_MASK_OFDM_IN_HT_2G;
 			wireless_set = WIRELESS_CCK | WIRELESS_OFDM |
 				       WIRELESS_HT;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 		} else if (sta->deflink.supp_rates[0] <= 0xf) {
-#else
-		} else if (sta->supp_rates[0] <= 0xf) {
-#endif
 			wireless_set = WIRELESS_CCK;
 		} else {
 			ra_mask &= RA_MASK_OFDM_RATES | RA_MASK_CCK_IN_BG;
@@ -1347,58 +1284,28 @@ void rtw_update_sta_info(struct rtw_dev *rtwdev, struct rtw_sta_info *si,
 		wireless_set = 0;
 	}
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 	switch (sta->deflink.bandwidth) {
-#else
-	switch (sta->bandwidth) {
-#endif
 	case IEEE80211_STA_RX_BW_80:
 		bw_mode = RTW_CHANNEL_WIDTH_80;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 		is_support_sgi = sta->deflink.vht_cap.vht_supported &&
 				 (sta->deflink.vht_cap.cap & IEEE80211_VHT_CAP_SHORT_GI_80);
-#else
-		is_support_sgi = sta->vht_cap.vht_supported &&
-				 (sta->vht_cap.cap & IEEE80211_VHT_CAP_SHORT_GI_80);
-#endif
 		break;
 	case IEEE80211_STA_RX_BW_40:
 		bw_mode = RTW_CHANNEL_WIDTH_40;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 		is_support_sgi = sta->deflink.ht_cap.ht_supported &&
 				 (sta->deflink.ht_cap.cap & IEEE80211_HT_CAP_SGI_40);
-#else
-		is_support_sgi = sta->ht_cap.ht_supported &&
-				 (sta->ht_cap.cap & IEEE80211_HT_CAP_SGI_40);
-#endif
 		break;
 	default:
 		bw_mode = RTW_CHANNEL_WIDTH_20;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 		is_support_sgi = sta->deflink.ht_cap.ht_supported &&
 				 (sta->deflink.ht_cap.cap & IEEE80211_HT_CAP_SGI_20);
-#else
-		is_support_sgi = sta->ht_cap.ht_supported &&
-				 (sta->ht_cap.cap & IEEE80211_HT_CAP_SGI_20);
-#endif
 		break;
 	}
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
-	if (sta->deflink.vht_cap.vht_supported && ra_mask & 0xffc00000) {
-#else
-	if (sta->vht_cap.vht_supported && ra_mask & 0xffc00000) {
-#endif
+	if (sta->deflink.vht_cap.vht_supported && ra_mask & 0xffc00000)
 		tx_num = 2;
-		rf_type = RF_2T2R;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
-	} else if (sta->deflink.ht_cap.ht_supported && ra_mask & 0xfff00000) {
-#else
-	} else if (sta->ht_cap.ht_supported && ra_mask & 0xfff00000) {
-#endif
+	else if (sta->deflink.ht_cap.ht_supported && ra_mask & 0xfff00000)
 		tx_num = 2;
-		rf_type = RF_2T2R;
-	}
 
 	rate_id = get_rate_id(wireless_set, bw_mode, tx_num);
 
@@ -1409,17 +1316,12 @@ void rtw_update_sta_info(struct rtw_dev *rtwdev, struct rtw_sta_info *si,
 	si->bw_mode = bw_mode;
 	si->stbc_en = stbc_en;
 	si->ldpc_en = ldpc_en;
-	si->rf_type = rf_type;
 	si->sgi_enable = is_support_sgi;
 	si->vht_enable = is_vht_enable;
 	si->ra_mask = ra_mask;
 	si->rate_id = rate_id;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
 	rtw_fw_send_ra_info(rtwdev, si, reset_ra_mask);
-#else
-	rtw_fw_send_ra_info(rtwdev, si);
-#endif
 }
 
 int rtw_wait_firmware_completion(struct rtw_dev *rtwdev)
@@ -1799,25 +1701,13 @@ static void rtw_vif_smps_iter(void *data, u8 *mac,
 {
 	struct rtw_dev *rtwdev = (struct rtw_dev *)data;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
 	if (vif->type != NL80211_IFTYPE_STATION || !vif->cfg.assoc)
-#else
-	if (vif->type != NL80211_IFTYPE_STATION || !vif->bss_conf.assoc)
-#endif
 		return;
 
 	if (rtwdev->hal.txrx_1ss)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
 		ieee80211_request_smps(vif, 0, IEEE80211_SMPS_STATIC);
-#else
-		ieee80211_request_smps(vif, IEEE80211_SMPS_STATIC);
-#endif
 	else
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
 		ieee80211_request_smps(vif, 0, IEEE80211_SMPS_OFF);
-#else
-		ieee80211_request_smps(vif, IEEE80211_SMPS_OFF);
-#endif
 }
 
 void rtw_set_txrx_1ss(struct rtw_dev *rtwdev, bool txrx_1ss)
@@ -2224,14 +2114,8 @@ int rtw_core_init(struct rtw_dev *rtwdev)
 	INIT_LIST_HEAD(&rtwdev->rsvd_page_list);
 	INIT_LIST_HEAD(&rtwdev->txqs);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
-	setup_timer(&rtwdev->tx_report.purge_timer,
-		    (void *)(long unsigned int)rtw_tx_report_purge_timer,
-		    (long unsigned int)rtwdev);
-#else
 	timer_setup(&rtwdev->tx_report.purge_timer,
 		    rtw_tx_report_purge_timer, 0);
-#endif
 	rtwdev->tx_wq = alloc_workqueue("rtw_tx_wq", WQ_UNBOUND | WQ_HIGHPRI, 0);
 	if (!rtwdev->tx_wq) {
 		rtw_warn(rtwdev, "alloc_workqueue rtw_tx_wq failed\n");
@@ -2320,11 +2204,7 @@ void rtw_core_deinit(struct rtw_dev *rtwdev)
 		release_firmware(wow_fw->firmware);
 
 	destroy_workqueue(rtwdev->tx_wq);
-# if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 2, 0)
 	timer_delete_sync(&rtwdev->tx_report.purge_timer);
-# else
-	del_timer_sync(&rtwdev->tx_report.purge_timer);
-# endif
 	spin_lock_irqsave(&rtwdev->tx_report.q_lock, flags);
 	skb_queue_purge(&rtwdev->tx_report.queue);
 	spin_unlock_irqrestore(&rtwdev->tx_report.q_lock, flags);
@@ -2405,9 +2285,7 @@ int rtw_register_hw(struct rtw_dev *rtwdev, struct ieee80211_hw *hw)
 	rtw_set_supported_band(hw, rtwdev->chip);
 	SET_IEEE80211_PERM_ADDR(hw, rtwdev->efuse.addr);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
 	hw->wiphy->sar_capa = &rtw_sar_capa;
-#endif
 
 	ret = rtw_regd_init(rtwdev);
 	if (ret) {
@@ -2415,16 +2293,18 @@ int rtw_register_hw(struct rtw_dev *rtwdev, struct ieee80211_hw *hw)
 		return ret;
 	}
 
+	rtw_led_init(rtwdev);
+
 	ret = ieee80211_register_hw(hw);
 	if (ret) {
 		rtw_err(rtwdev, "failed to register hw\n");
-		return ret;
+		goto led_deinit;
 	}
 
 	ret = rtw_regd_hint(rtwdev);
 	if (ret) {
 		rtw_err(rtwdev, "failed to hint regd\n");
-		return ret;
+		goto led_deinit;
 	}
 
 	rtw_debugfs_init(rtwdev);
@@ -2433,6 +2313,10 @@ int rtw_register_hw(struct rtw_dev *rtwdev, struct ieee80211_hw *hw)
 	rtwdev->bf_info.bfer_su_cnt = 0;
 
 	return 0;
+
+led_deinit:
+	rtw_led_deinit(rtwdev);
+	return ret;
 }
 EXPORT_SYMBOL(rtw_register_hw);
 
@@ -2443,6 +2327,7 @@ void rtw_unregister_hw(struct rtw_dev *rtwdev, struct ieee80211_hw *hw)
 	ieee80211_unregister_hw(hw);
 	rtw_unset_supported_band(hw, chip);
 	rtw_debugfs_deinit(rtwdev);
+	rtw_led_deinit(rtwdev);
 }
 EXPORT_SYMBOL(rtw_unregister_hw);
 
@@ -2541,11 +2426,7 @@ static void rtw_check_sta_active_iter(void *data, struct ieee80211_vif *vif)
 	if (vif->type != NL80211_IFTYPE_STATION)
 		return;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
 	if (vif->cfg.assoc || !is_zero_ether_addr(rtwvif->bssid))
-#else
-	if (vif->bss_conf.assoc || !is_zero_ether_addr(rtwvif->bssid))
-#endif
 		*active = true;
 }
 

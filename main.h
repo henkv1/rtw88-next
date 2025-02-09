@@ -5,71 +5,17 @@
 #ifndef __RTK_MAIN_H_
 #define __RTK_MAIN_H_
 
-#include <linux/version.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
-#include "compiler.h"
-#endif
 #include <net/mac80211.h>
 #include <linux/vmalloc.h>
 #include <linux/firmware.h>
 #include <linux/average.h>
 #include <linux/bitops.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
 #include <linux/bitfield.h>
-#else
-#include "bitfield.h"
-#endif
 #include <linux/iopoll.h>
 #include <linux/interrupt.h>
 #include <linux/workqueue.h>
 
 #include "util.h"
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
-#include <linux/etherdevice.h>
-#endif
-
-#if !defined(RHEL_RELEASE_CODE)
-#define RHEL_RELEASE_CODE 0
-#define RHEL_RELEASE_VERSION(a, b) a<<8 & b
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0)
-/**
- * cfg80211_ssid_eq - compare two SSIDs
- * @a: first SSID
- * @b: second SSID
- *
- * Return: %true if SSIDs are equal, %false otherwise.
- */
-static inline bool
-cfg80211_ssid_eq(struct cfg80211_ssid *a, struct cfg80211_ssid *b)
-{
-       if (WARN_ON(!a || !b))
-               return false;
-       if (a->ssid_len != b->ssid_len)
-               return false;
-       return memcmp(a->ssid, b->ssid, a->ssid_len) ? false : true;
-}
-
-#endif
-
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 8, 0)) || defined(RHEL_RELEASE) && (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(8,0))
-/* see Documentation/timers/timers-howto.rst for the thresholds */
-static inline void fsleep(unsigned long usecs)
-{
-        if (usecs <= 10)
-                udelay(usecs);
-        else if (usecs <= 20000)
-                usleep_range(usecs, 2 * usecs);
-        else
-                msleep(DIV_ROUND_UP(usecs, 1000));
-}
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
-#define NUM_NL80211_BANDS IEEE80211_NUM_BANDS
-#endif
 
 #define RTW_MAX_MAC_ID_NUM		32
 #define RTW_MAX_SEC_CAM_NUM		32
@@ -564,12 +510,12 @@ struct rtw_5g_txpwr_idx {
 	struct rtw_5g_vht_ns_pwr_idx_diff vht_2s_diff;
 	struct rtw_5g_vht_ns_pwr_idx_diff vht_3s_diff;
 	struct rtw_5g_vht_ns_pwr_idx_diff vht_4s_diff;
-};
+} __packed;
 
 struct rtw_txpwr_idx {
 	struct rtw_2g_txpwr_idx pwr_idx_2g;
 	struct rtw_5g_txpwr_idx pwr_idx_5g;
-};
+} __packed;
 
 struct rtw_channel_params {
 	u8 center_chan;
@@ -811,7 +757,6 @@ struct rtw_sta_info {
 	u8 mac_id;
 	u8 rate_id;
 	enum rtw_bandwidth bw_mode;
-	enum rtw_rf_type rf_type;
 	u8 stbc_en:2;
 	u8 ldpc_en:2;
 	bool sgi_enable;
@@ -942,6 +887,7 @@ struct rtw_chip_ops {
 			       bool is_tx2_path);
 	void (*config_txrx_mode)(struct rtw_dev *rtwdev, u8 tx_path,
 				 u8 rx_path, bool is_tx2_path);
+	void (*led_set)(struct led_classdev *led, enum led_brightness brightness);
 	/* for USB/SDIO only */
 	void (*fill_txdesc_checksum)(struct rtw_dev *rtwdev,
 				     struct rtw_tx_pkt_info *pkt_info,
@@ -2152,6 +2098,10 @@ struct rtw_dev {
 	struct completion fw_scan_density;
 	bool ap_active;
 
+	bool led_registered;
+	char led_name[32];
+	struct led_classdev led_cdev;
+
 	/* hci related data, must be last */
 	u8 priv[] __aligned(sizeof(void *));
 };
@@ -2261,11 +2211,7 @@ void rtw_set_channel(struct rtw_dev *rtwdev);
 void rtw_chip_prepare_tx(struct rtw_dev *rtwdev);
 void rtw_vif_port_config(struct rtw_dev *rtwdev, struct rtw_vif *rtwvif,
 			 u32 config);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
-void rtw_tx_report_purge_timer(void *ctx);
-#else
 void rtw_tx_report_purge_timer(struct timer_list *t);
-#endif
 void rtw_update_sta_info(struct rtw_dev *rtwdev, struct rtw_sta_info *si,
 			 bool reset_ra_mask);
 void rtw_core_scan_start(struct rtw_dev *rtwdev, struct rtw_vif *rtwvif,
@@ -2301,18 +2247,4 @@ void rtw_update_channel(struct rtw_dev *rtwdev, u8 center_channel,
 void rtw_core_port_switch(struct rtw_dev *rtwdev, struct ieee80211_vif *vif);
 bool rtw_core_check_sta_active(struct rtw_dev *rtwdev);
 void rtw_core_enable_beacon(struct rtw_dev *rtwdev, bool enable);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0)
-static inline bool rtw_ssid_equal(struct cfg80211_ssid *a,
-                                 struct cfg80211_ssid *b)
-{
-       if (!a || !b || a->ssid_len != b->ssid_len)
-               return false;
-
-       if (memcmp(a->ssid, b->ssid, a->ssid_len))
-               return false;
-
-       return true;
-}
-#endif
-
 #endif

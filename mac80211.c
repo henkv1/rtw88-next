@@ -13,9 +13,7 @@
 #include "bf.h"
 #include "debug.h"
 #include "wow.h"
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
 #include "sar.h"
-#endif
 
 static void rtw_ops_tx(struct ieee80211_hw *hw,
 		       struct ieee80211_tx_control *control,
@@ -64,11 +62,7 @@ static int rtw_ops_start(struct ieee80211_hw *hw)
 	return ret;
 }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0))
-static void rtw_ops_stop(struct ieee80211_hw *hw)
-#else
 static void rtw_ops_stop(struct ieee80211_hw *hw, bool suspend)
-#endif
 {
 	struct rtw_dev *rtwdev = hw->priv;
 
@@ -378,11 +372,7 @@ static void rtw_conf_tx(struct rtw_dev *rtwdev,
 static void rtw_ops_bss_info_changed(struct ieee80211_hw *hw,
 				     struct ieee80211_vif *vif,
 				     struct ieee80211_bss_conf *conf,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
 				     u64 changed)
-#else
-				     u32 changed)
-#endif
 {
 	struct rtw_dev *rtwdev = hw->priv;
 	struct rtw_vif *rtwvif = (struct rtw_vif *)vif->drv_priv;
@@ -396,22 +386,14 @@ static void rtw_ops_bss_info_changed(struct ieee80211_hw *hw,
 
 	if (changed & BSS_CHANGED_ASSOC) {
 		rtw_vif_assoc_changed(rtwvif, conf);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
 		if (vif->cfg.assoc) {
-#else
-		if (conf->assoc) {
-#endif
-		rtw_coex_connect_notify(rtwdev, COEX_ASSOCIATE_FINISH);
+			rtw_coex_connect_notify(rtwdev, COEX_ASSOCIATE_FINISH);
 
 			rtw_fw_download_rsvd_page(rtwdev);
 			rtw_send_rsvd_page_h2c(rtwdev);
 			rtw_fw_default_port(rtwdev, rtwvif);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
 			rtw_coex_media_status_notify(rtwdev, vif->cfg.assoc);
-#else
-			rtw_coex_media_status_notify(rtwdev, conf->assoc);
-#endif
-		if (rtw_bf_support)
+			if (rtw_bf_support)
 				rtw_bf_assoc(rtwdev, vif, conf);
 
 			rtw_fw_beacon_filter_config(rtwdev, true, vif);
@@ -475,13 +457,9 @@ static void rtw_ops_bss_info_changed(struct ieee80211_hw *hw,
 	mutex_unlock(&rtwdev->mutex);
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
 static int rtw_ops_start_ap(struct ieee80211_hw *hw,
 			    struct ieee80211_vif *vif,
 			    struct ieee80211_bss_conf *link_conf)
-#else
-static int rtw_ops_start_ap(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
-#endif
 {
 	struct rtw_dev *rtwdev = hw->priv;
 	const struct rtw_chip_info *chip = rtwdev->chip;
@@ -496,14 +474,9 @@ static int rtw_ops_start_ap(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
 	return 0;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
 static void rtw_ops_stop_ap(struct ieee80211_hw *hw,
 			    struct ieee80211_vif *vif,
 			    struct ieee80211_bss_conf *link_conf)
-#else
-static void rtw_ops_stop_ap(struct ieee80211_hw *hw,
-			    struct ieee80211_vif *vif)
-#endif
 {
 	struct rtw_dev *rtwdev = hw->priv;
 
@@ -517,11 +490,7 @@ static void rtw_ops_stop_ap(struct ieee80211_hw *hw,
 
 static int rtw_ops_conf_tx(struct ieee80211_hw *hw,
 			   struct ieee80211_vif *vif,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
 			   unsigned int link_id, u16 ac,
-#else
-			   u16 ac,
-#endif
 			   const struct ieee80211_tx_queue_params *params)
 {
 	struct rtw_dev *rtwdev = hw->priv;
@@ -656,35 +625,18 @@ out:
 	return ret;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0)
 static int rtw_ops_ampdu_action(struct ieee80211_hw *hw,
 				struct ieee80211_vif *vif,
 				struct ieee80211_ampdu_params *params)
-#else
-static int rtw_ops_ampdu_action(struct ieee80211_hw *hw,
-				struct ieee80211_vif *vif,
-				enum ieee80211_ampdu_mlme_action action,
-				struct ieee80211_sta *sta, u16 tid, u16 *ssn,
-				u8 buf_size, bool amsdu)
-#endif
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0)
 	struct ieee80211_sta *sta = params->sta;
 	u16 tid = params->tid;
 	struct ieee80211_txq *txq = sta->txq[tid];
 	struct rtw_txq *rtwtxq = (struct rtw_txq *)txq->drv_priv;
 
 	switch (params->action) {
-#else
-	switch (action) {
-#endif
 	case IEEE80211_AMPDU_TX_START:
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0)
 		return IEEE80211_AMPDU_TX_START_IMMEDIATE;
-#else
-		ieee80211_start_tx_ba_cb_irqsafe(vif, sta->addr, tid);
-		break;
-#endif
 	case IEEE80211_AMPDU_TX_STOP_CONT:
 	case IEEE80211_AMPDU_TX_STOP_FLUSH:
 	case IEEE80211_AMPDU_TX_STOP_FLUSH_CONT:
@@ -705,7 +657,6 @@ static int rtw_ops_ampdu_action(struct ieee80211_hw *hw,
 	return 0;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
 static bool rtw_ops_can_aggregate_in_amsdu(struct ieee80211_hw *hw,
 					   struct sk_buff *head,
 					   struct sk_buff *skb)
@@ -719,7 +670,6 @@ static bool rtw_ops_can_aggregate_in_amsdu(struct ieee80211_hw *hw,
 
 	return true;
 }
-#endif
 
 static void rtw_ops_sw_scan_start(struct ieee80211_hw *hw,
 				  struct ieee80211_vif *vif,
@@ -743,18 +693,9 @@ static void rtw_ops_sw_scan_complete(struct ieee80211_hw *hw,
 	mutex_unlock(&rtwdev->mutex);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0)
 static void rtw_ops_mgd_prepare_tx(struct ieee80211_hw *hw,
 				   struct ieee80211_vif *vif,
-    #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0))
 				   struct ieee80211_prep_tx_info *info)
-    #else
-				   u16 duration)
-    #endif
-#else
-static void rtw_ops_mgd_prepare_tx(struct ieee80211_hw *hw,
-				   struct ieee80211_vif *vif)
-#endif
 {
 	struct rtw_dev *rtwdev = hw->priv;
 
@@ -973,7 +914,6 @@ static void rtw_ops_cancel_hw_scan(struct ieee80211_hw *hw,
 	mutex_unlock(&rtwdev->mutex);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
 static int rtw_ops_set_sar_specs(struct ieee80211_hw *hw,
 				 const struct cfg80211_sar_specs *sar)
 {
@@ -985,12 +925,12 @@ static int rtw_ops_set_sar_specs(struct ieee80211_hw *hw,
 
 	return 0;
 }
-#endif
 
 static void rtw_ops_sta_rc_update(struct ieee80211_hw *hw,
 				  struct ieee80211_vif *vif,
-				  struct ieee80211_sta *sta, u32 changed)
+				    struct ieee80211_sta *sta, u32 changed)
 {
+//	struct ieee80211_sta *sta = link_sta->sta;
 	struct rtw_dev *rtwdev = hw->priv;
 	struct rtw_sta_info *si = (struct rtw_sta_info *)sta->drv_priv;
 
@@ -999,12 +939,10 @@ static void rtw_ops_sta_rc_update(struct ieee80211_hw *hw,
 }
 
 const struct ieee80211_ops rtw_ops = {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
 	.add_chanctx = ieee80211_emulate_add_chanctx,
 	.remove_chanctx = ieee80211_emulate_remove_chanctx,
 	.change_chanctx = ieee80211_emulate_change_chanctx,
 	.switch_vif_chanctx = ieee80211_emulate_switch_vif_chanctx,
-#endif
 	.tx			= rtw_ops_tx,
 	.wake_tx_queue		= rtw_ops_wake_tx_queue,
 	.start			= rtw_ops_start,
@@ -1023,9 +961,7 @@ const struct ieee80211_ops rtw_ops = {
 	.set_tim		= rtw_ops_set_tim,
 	.set_key		= rtw_ops_set_key,
 	.ampdu_action		= rtw_ops_ampdu_action,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
 	.can_aggregate_in_amsdu	= rtw_ops_can_aggregate_in_amsdu,
-#endif
 	.sw_scan_start		= rtw_ops_sw_scan_start,
 	.sw_scan_complete	= rtw_ops_sw_scan_complete,
 	.mgd_prepare_tx		= rtw_ops_mgd_prepare_tx,
@@ -1038,10 +974,8 @@ const struct ieee80211_ops rtw_ops = {
 	.reconfig_complete	= rtw_reconfig_complete,
 	.hw_scan		= rtw_ops_hw_scan,
 	.cancel_hw_scan		= rtw_ops_cancel_hw_scan,
-	.sta_rc_update		= rtw_ops_sta_rc_update,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+        .sta_rc_update          = rtw_ops_sta_rc_update,
 	.set_sar_specs          = rtw_ops_set_sar_specs,
-#endif
 #ifdef CONFIG_PM
 	.suspend		= rtw_ops_suspend,
 	.resume			= rtw_ops_resume,

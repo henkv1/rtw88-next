@@ -1615,11 +1615,7 @@ static struct rtw_hci_ops rtw_pci_ops = {
 
 static int rtw_pci_request_irq(struct rtw_dev *rtwdev, struct pci_dev *pdev)
 {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0))
 	unsigned int flags = PCI_IRQ_INTX;
-#else
-	unsigned int flags = PCI_IRQ_LEGACY;
-#endif
 	int ret;
 
 	if (!rtw_disable_msi)
@@ -1692,22 +1688,11 @@ static int rtw_pci_napi_init(struct rtw_dev *rtwdev)
 {
 	struct rtw_pci *rtwpci = (struct rtw_pci *)rtwdev->priv;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 11, 0)
 	rtwpci->netdev = alloc_netdev_dummy(0);
 	if (!rtwpci->netdev)
 		return -ENOMEM;
-#else
-	init_dummy_netdev(rtwpci->netdev);
-#endif
 
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
-        netif_napi_add(rtwpci->netdev, &rtwpci->napi, rtw_pci_napi_poll);
-
-#else
-	netif_napi_add(&rtwpci->netdev, &rtwpci->napi, rtw_pci_napi_poll,
-		       NAPI_POLL_WEIGHT);
-#endif
+	netif_napi_add(rtwpci->netdev, &rtwpci->napi, rtw_pci_napi_poll);
 	return 0;
 }
 

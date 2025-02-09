@@ -2,8 +2,6 @@
 /* Copyright(c) 2018-2021  Realtek Corporation
  */
 
-#include <linux/version.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
 #include "sar.h"
 #include "phy.h"
 #include "debug.h"
@@ -114,4 +112,3 @@ int rtw_set_sar_specs(struct rtw_dev *rtwdev,
 
 	return rtw_apply_sar(rtwdev, &new);
 }
-#endif
